@@ -9,5 +9,5 @@ dist/
 .build/
 .git/
 frontend/
-.lightning_studio
 .env
+.lightning_studio
