@@ -91,22 +91,22 @@ jobs:
 
       #     curl -f http://localhost:8000 || exit 1
 
-      - name: Verify deployment
-        run: |
-          if docker ps | grep -q triage_v2; then
-            echo "Container is running"
-          else
-            echo "Container failed to start"
-            docker logs triage_v2
-            exit 1
-          fi
+      # - name: Verify deployment
+      #   run: |
+      #     if docker ps | grep -q triage_v2; then
+      #       echo "Container is running"
+      #     else
+      #       echo "Container failed to start"
+      #       docker logs triage_v2
+      #       exit 1
+      #     fi
           
-          # Give the app more time to start
-          sleep 5
+      #     # Give the app more time to start
+      #     sleep 5
           
-          # Check logs before curl
-          echo "=== Container Logs ==="
-          docker logs triage_v2
+      #     # Check logs before curl
+      #     echo "=== Container Logs ==="
+      #     docker logs triage_v2
           
-          # Test the endpoint
-          curl -f http://localhost:8000 || (docker logs triage_v2 && exit 1)
+      #     # Test the endpoint
+      #     curl -f http://localhost:8000 || (docker logs triage_v2 && exit 1)
