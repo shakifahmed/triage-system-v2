@@ -76,20 +76,34 @@ jobs:
             ${{ secrets.DOCKERHUB_USERNAME }}/triage_v2:latest
 
 
+      # - name: Wait for application to start
+      #   run: sleep 50
+
+      # - name: Verify deployment
+      #   run: |
+      #     if docker ps | grep -q triage_v2; then
+      #       echo "Container is running"
+      #     else
+      #       echo "Container failed to start"
+      #       docker logs triage_v2
+      #       exit 1
+      #     fi
+
+      #     curl -f http://localhost:8000 || exit 1
+
       - name: Wait for application to start
-        run: sleep 50
-
-      - name: Verify deployment
         run: |
-          if docker ps | grep -q triage_v2; then
-            echo "Container is running"
-          else
-            echo "Container failed to start"
-            docker logs triage_v2
-            exit 1
-          fi
-
-          curl -f http://localhost:8000 || exit 1
+          for i in {1..30}; do
+            if curl -s http://localhost:8000 > /dev/null 2>&1; then
+              echo "✓ Ready after $((i*2)) seconds"
+              exit 0
+            fi
+            echo "Attempt $i/30..."
+            sleep 2
+          done
+          echo "Timeout after 60 seconds"
+          docker logs triage_v2
+          exit 1
 
       # - name: Verify deployment
       #   run: |
