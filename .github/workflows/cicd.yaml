@@ -24,7 +24,7 @@ jobs:
 
       - name: Build and push Docker image
         run: |
-          docker build -t ${{ secrets.DOCKERHUB_USERNAME }}/triage_v2:latest backend
+          docker build -f backend/Dockerfile -t ${{ secrets.DOCKERHUB_USERNAME }}/triage_v2:latest .
           docker push ${{ secrets.DOCKERHUB_USERNAME }}/triage_v2:latest
 
 
