@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.swp
+*.tmp
+*.log
+dist/
+.build/
+.git/
+frontend/
+.lightning_studio
+api.py
+.env
