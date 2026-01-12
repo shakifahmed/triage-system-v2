@@ -10,5 +10,4 @@ dist/
 .git/
 frontend/
 .lightning_studio
-api.py
 .env
