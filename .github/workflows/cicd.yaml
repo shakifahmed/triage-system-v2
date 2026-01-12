@@ -69,7 +69,7 @@ jobs:
           docker run -d \
             --name triage_v2 \
             --restart unless-stopped \
-            -e OPENAI_API_KEY="${{ secrets.CEREBRAS_API_KEY }}" \
+            -e CEREBRAS_API_KEY="${{ secrets.CEREBRAS_API_KEY }}" \
             -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
             -e ALLOWED_ORIGINS="${{ secrets.ALLOWED_ORIGINS }}" \
             -p 8000:8000 \
