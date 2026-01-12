@@ -53,6 +53,17 @@ jobs:
         run: |
           docker image prune -f
 
+      # - name: Run FastAPI container
+      #   run: |
+      #     docker run -d \
+      #       --name triage_v2 \
+      #       --restart unless-stopped \
+      #       -e OPENAI_API_KEY="${{ secrets.CEREBRAS_API_KEY }}" \
+      #       -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+      #       -p 8000:8000 \
+      #       ${{ secrets.DOCKERHUB_USERNAME }}/triage_v2:latest
+
+
       - name: Run FastAPI container
         run: |
           docker run -d \
@@ -60,8 +71,10 @@ jobs:
             --restart unless-stopped \
             -e OPENAI_API_KEY="${{ secrets.CEREBRAS_API_KEY }}" \
             -e DATABASE_URL="${{ secrets.DATABASE_URL }}" \
+            -e ALLOWED_ORIGINS="${{ secrets.ALLOWED_ORIGINS }}" \
             -p 8000:8000 \
             ${{ secrets.DOCKERHUB_USERNAME }}/triage_v2:latest
+
 
       - name: Wait for application to start
         run: sleep 10
