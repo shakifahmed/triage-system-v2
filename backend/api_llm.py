@@ -32,7 +32,7 @@ from langchain.output_parsers import OutputFixingParser
 
 DATABASE_URL = os.getenv(
     "DATABASE_URL", 
-    "postgresql://neondb_owner:npg_YyFPc4BEdu3N@ep-withered-sea-ahgolqjm.c-3.us-east-1.aws.neon.tech/neondb?sslmode=require"
+    ""
 )
 
 TRIAGE_ARTIFACTS_PATH = os.getenv(
