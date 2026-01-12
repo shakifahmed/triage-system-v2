@@ -10,10 +10,10 @@ const TriageSystem = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
-  const [age, setAge] = useState(30);
+  const [age, setAge] = useState('30');
   const [gender, setGender] = useState('Male');
   const [severity, setSeverity] = useState('Moderate');
-  const [duration, setDuration] = useState(3);
+  const [duration, setDuration] = useState('3');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [apiStatus, setApiStatus] = useState(false);
@@ -133,9 +133,37 @@ const TriageSystem = () => {
     setSelectedIndex(-1);
   };
 
+  const handleAgeChange = (e) => {
+    const value = e.target.value;
+    // Allow empty string or valid numbers
+    if (value === '' || /^\d+$/.test(value)) {
+      setAge(value);
+    }
+  };
+
+  const handleDurationChange = (e) => {
+    const value = e.target.value;
+    // Allow empty string or valid numbers
+    if (value === '' || /^\d+$/.test(value)) {
+      setDuration(value);
+    }
+  };
+
+  const isFormValid = () => {
+    return (
+      symptoms.length > 0 &&
+      age !== '' &&
+      parseInt(age) > 0 &&
+      duration !== '' &&
+      parseInt(duration) >= 0 &&
+      gender !== '' &&
+      severity !== ''
+    );
+  };
+
   const handleSubmit = async () => {
-    if (symptoms.length === 0) {
-      setError('Please select at least one symptom');
+    if (!isFormValid()) {
+      setError('Please fill in all required fields');
       return;
     }
 
@@ -149,10 +177,10 @@ const TriageSystem = () => {
 
     const payload = {
       symptoms: symptoms.join(', '),
-      age,
+      age: parseInt(age),
       gender,
       severity,
-      duration
+      duration: parseInt(duration)
     };
 
     try {
@@ -333,11 +361,10 @@ const TriageSystem = () => {
                       Age *
                     </label>
                     <input
-                      type="number"
+                      type="text"
                       value={age}
-                      onChange={(e) => setAge(parseInt(e.target.value) || 0)}
-                      min="0"
-                      max="120"
+                      onChange={handleAgeChange}
+                      placeholder="Enter age"
                       className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 transition-all outline-none"
                     />
                   </div>
@@ -384,11 +411,10 @@ const TriageSystem = () => {
                       Duration (days) *
                     </label>
                     <input
-                      type="number"
+                      type="text"
                       value={duration}
-                      onChange={(e) => setDuration(parseInt(e.target.value) || 0)}
-                      min="0"
-                      max="365"
+                      onChange={handleDurationChange}
+                      placeholder="Enter days"
                       className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 transition-all outline-none"
                     />
                   </div>
@@ -402,7 +428,7 @@ const TriageSystem = () => {
 
                 <button
                   onClick={handleSubmit}
-                  disabled={loading || !apiStatus}
+                  disabled={loading || !apiStatus || !isFormValid()}
                   className="w-full bg-gradient-to-r from-cyan-600 to-blue-600 text-white py-4 rounded-xl font-semibold hover:from-cyan-700 hover:to-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg hover:shadow-xl"
                 >
                   {loading ? 'Analyzing...' : 'Get Recommendation'}
@@ -449,23 +475,15 @@ const TriageSystem = () => {
                     )}
                   </div>
 
-                  {/* Feedback Section (smaller + compact) */}
+                  {/* Feedback Section (smaller + compact) - ID removed */}
                   <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
-                    <div className="flex items-start justify-between gap-3 mb-2">
-                      <div>
-                        <h4 className="text-sm font-bold text-gray-800">
-                          We value your opinion
-                        </h4>
-                        <p className="text-xs text-gray-600">
-                          Rating & comments
-                        </p>
-                      </div>
-
-                      {predictionId != null && (
-                        <div className="text-[11px] text-gray-500">
-                          ID: <span className="font-semibold">{predictionId}</span>
-                        </div>
-                      )}
+                    <div className="mb-2">
+                      <h4 className="text-sm font-bold text-gray-800">
+                        We value your opinion
+                      </h4>
+                      <p className="text-xs text-gray-600">
+                        Rating & comments
+                      </p>
                     </div>
 
                     <div className="flex items-center justify-between gap-3">
