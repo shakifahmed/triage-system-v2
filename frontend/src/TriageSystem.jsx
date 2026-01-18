@@ -1,8 +1,78 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { Search, ChevronDown, Activity, Calendar, User, AlertCircle, Star } from 'lucide-react';
 
-const API_URL = "/api";
-// const API_URL = "http://127.0.0.1:8000";
+// const API_URL = "/api";
+const API_URL = "http://127.0.0.1:8000";
+
+// Helper: compute a fixed-position dropdown menu style that stays on top of everything
+const useFixedDropdownPosition = (isOpen, anchorRef, offset = 8) => {
+  const [style, setStyle] = useState(null);
+
+  useLayoutEffect(() => {
+    if (!isOpen) return;
+
+    const compute = () => {
+      const el = anchorRef.current;
+      if (!el) return;
+
+      const rect = el.getBoundingClientRect();
+      const vw = window.innerWidth;
+      const vh = window.innerHeight;
+
+      const maxMenuHeight = Math.max(160, Math.floor(vh * 0.45));
+      const spaceBelow = vh - rect.bottom - offset;
+      const spaceAbove = rect.top - offset;
+
+      const openUpwards = spaceBelow < 200 && spaceAbove > spaceBelow;
+
+      const width = rect.width;
+      const left = Math.max(8, Math.min(rect.left, vw - width - 8));
+
+      const base = {
+        position: 'fixed',
+        left: `${left}px`,
+        width: `${width}px`,
+        zIndex: 99999,
+        maxHeight: `${maxMenuHeight}px`,
+        overflowY: 'auto',
+      };
+
+      if (openUpwards) {
+        base.bottom = `${vh - rect.top + offset}px`;
+      } else {
+        base.top = `${rect.bottom + offset}px`;
+      }
+
+      setStyle(base);
+    };
+
+    compute();
+
+    window.addEventListener('scroll', compute, true);
+    window.addEventListener('resize', compute);
+    window.addEventListener('orientationchange', compute);
+
+    return () => {
+      window.removeEventListener('scroll', compute, true);
+      window.removeEventListener('resize', compute);
+      window.removeEventListener('orientationchange', compute);
+    };
+  }, [isOpen, anchorRef, offset]);
+
+  return style;
+};
+
+// Helper: portal dropdown
+const DropdownPortal = ({ isOpen, style, children }) => {
+  if (!isOpen || !style) return null;
+  return ReactDOM.createPortal(
+    <div style={style} className="rounded-xl shadow-2xl border border-gray-100 bg-white overflow-hidden">
+      {children}
+    </div>,
+    document.body
+  );
+};
 
 const TriageSystem = () => {
   const [symptoms, setSymptoms] = useState([]);
@@ -10,10 +80,23 @@ const TriageSystem = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [showDropdown, setShowDropdown] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(-1);
+
   const [age, setAge] = useState('30');
+
+  // Gender (custom dropdown)
   const [gender, setGender] = useState('Male');
-  const [severity, setSeverity] = useState('Moderate');
+  const [showGenderDropdown, setShowGenderDropdown] = useState(false);
+  const [genderSelectedIndex, setGenderSelectedIndex] = useState(-1);
+  const genderBtnRef = useRef(null);
+
+  // Severity (custom dropdown with descriptions only when open)
+  const [severity, setSeverity] = useState('Mild');
+  const [showSeverityDropdown, setShowSeverityDropdown] = useState(false);
+  const [severitySelectedIndex, setSeveritySelectedIndex] = useState(-1);
+  const severityBtnRef = useRef(null);
+
   const [duration, setDuration] = useState('3');
+
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [apiStatus, setApiStatus] = useState(false);
@@ -26,6 +109,29 @@ const TriageSystem = () => {
   const [feedbackText, setFeedbackText] = useState('');
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false);
   const [feedbackLoading, setFeedbackLoading] = useState(false);
+
+  const genderOptions = useMemo(() => (['Male', 'Female']), []);
+
+  const severityOptions = useMemo(() => ([
+    { value: 'Mild', desc: 'No interference with daily activities.' },
+    { value: 'Moderate', desc: 'Some daily activities limited,' },
+    { value: 'Severe', desc: 'Cannot perform any daily activities' }
+  ]), []);
+
+  // Fixed-position dropdown styles (portal)
+  const genderMenuStyle = useFixedDropdownPosition(showGenderDropdown, genderBtnRef, 8);
+  const severityMenuStyle = useFixedDropdownPosition(showSeverityDropdown, severityBtnRef, 8);
+
+  // ----- Age/Duration validation (requested limits) -----
+  const ageNum = age === '' ? NaN : Number(age);
+  const durationNum = duration === '' ? NaN : Number(duration);
+
+  const isAgeValid = age !== '' && Number.isFinite(ageNum) && ageNum >= 0 && ageNum <= 120;
+  const isDurationValid = duration !== '' && Number.isFinite(durationNum) && durationNum >= 0 && durationNum <= 365;
+
+  // Red border only when user has typed something and it's invalid
+  const ageHasError = age !== '' && !isAgeValid;
+  const durationHasError = duration !== '' && !isDurationValid;
 
   useEffect(() => {
     fetch('/symptom_master_list.csv')
@@ -55,6 +161,55 @@ const TriageSystem = () => {
     const interval = setInterval(checkHealth, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // Click outside closes Gender/Severity dropdowns + Escape closes both
+  useEffect(() => {
+    const onMouseDown = (e) => {
+      // Gender
+      if (showGenderDropdown) {
+        const btn = genderBtnRef.current;
+        const menu = document.getElementById('gender-dropdown-menu');
+        const clickedInsideBtn = btn && btn.contains(e.target);
+        const clickedInsideMenu = menu && menu.contains(e.target);
+        if (!clickedInsideBtn && !clickedInsideMenu) {
+          setShowGenderDropdown(false);
+          setGenderSelectedIndex(-1);
+        }
+      }
+
+      // Severity
+      if (showSeverityDropdown) {
+        const btn = severityBtnRef.current;
+        const menu = document.getElementById('severity-dropdown-menu');
+        const clickedInsideBtn = btn && btn.contains(e.target);
+        const clickedInsideMenu = menu && menu.contains(e.target);
+        if (!clickedInsideBtn && !clickedInsideMenu) {
+          setShowSeverityDropdown(false);
+          setSeveritySelectedIndex(-1);
+        }
+      }
+    };
+
+    const onKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (showGenderDropdown) {
+          setShowGenderDropdown(false);
+          setGenderSelectedIndex(-1);
+        }
+        if (showSeverityDropdown) {
+          setShowSeverityDropdown(false);
+          setSeveritySelectedIndex(-1);
+        }
+      }
+    };
+
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('mousedown', onMouseDown);
+      document.removeEventListener('keydown', onKeyDown);
+    };
+  }, [showGenderDropdown, showSeverityDropdown]);
 
   const filteredSymptoms = useMemo(() => {
     if (!searchTerm.trim()) return [];
@@ -113,6 +268,51 @@ const TriageSystem = () => {
     }
   };
 
+  // Keyboard navigation for Gender dropdown
+  const handleGenderKeyDown = (e) => {
+    if (!showGenderDropdown) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setGenderSelectedIndex(prev => (prev < genderOptions.length - 1 ? prev + 1 : prev));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setGenderSelectedIndex(prev => (prev > 0 ? prev - 1 : 0));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const idx = genderSelectedIndex >= 0 ? genderSelectedIndex : genderOptions.indexOf(gender);
+      const chosen = genderOptions[Math.max(0, idx)];
+      if (chosen) {
+        setGender(chosen);
+        setShowGenderDropdown(false);
+        setGenderSelectedIndex(-1);
+      }
+    }
+  };
+
+  // Keyboard navigation for Severity dropdown
+  const handleSeverityKeyDown = (e) => {
+    if (!showSeverityDropdown) return;
+
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setSeveritySelectedIndex(prev => (prev < severityOptions.length - 1 ? prev + 1 : prev));
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setSeveritySelectedIndex(prev => (prev > 0 ? prev - 1 : 0));
+    } else if (e.key === 'Enter') {
+      e.preventDefault();
+      const currentIdx = severityOptions.findIndex(o => o.value === severity);
+      const idx = severitySelectedIndex >= 0 ? severitySelectedIndex : currentIdx;
+      const chosen = severityOptions[Math.max(0, idx)];
+      if (chosen) {
+        setSeverity(chosen.value);
+        setShowSeverityDropdown(false);
+        setSeveritySelectedIndex(-1);
+      }
+    }
+  };
+
   const addSymptom = (symptom) => {
     if (!symptoms.includes(symptom)) {
       setSymptoms([...symptoms, symptom]);
@@ -135,7 +335,7 @@ const TriageSystem = () => {
 
   const handleAgeChange = (e) => {
     const value = e.target.value;
-    // Allow empty string or valid numbers
+    // Allow empty string or digits only
     if (value === '' || /^\d+$/.test(value)) {
       setAge(value);
     }
@@ -143,7 +343,7 @@ const TriageSystem = () => {
 
   const handleDurationChange = (e) => {
     const value = e.target.value;
-    // Allow empty string or valid numbers
+    // Allow empty string or digits only
     if (value === '' || /^\d+$/.test(value)) {
       setDuration(value);
     }
@@ -152,10 +352,8 @@ const TriageSystem = () => {
   const isFormValid = () => {
     return (
       symptoms.length > 0 &&
-      age !== '' &&
-      parseInt(age) > 0 &&
-      duration !== '' &&
-      parseInt(duration) >= 0 &&
+      isAgeValid &&
+      isDurationValid &&
       gender !== '' &&
       severity !== ''
     );
@@ -177,10 +375,10 @@ const TriageSystem = () => {
 
     const payload = {
       symptoms: symptoms.join(', '),
-      age: parseInt(age),
+      age: parseInt(age, 10),
       gender,
       severity,
-      duration: parseInt(duration)
+      duration: parseInt(duration, 10)
     };
 
     try {
@@ -217,7 +415,6 @@ const TriageSystem = () => {
     const feedbackPayload = {
       rating: rating || null,
       feedback_text: feedbackText.trim() || null
-      // If your backend accepts/needs prediction_id, you can add it back:
       // prediction_id: predictionId
     };
 
@@ -364,25 +561,72 @@ const TriageSystem = () => {
                       type="text"
                       value={age}
                       onChange={handleAgeChange}
-                      placeholder="Enter age"
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 transition-all outline-none"
+                      placeholder="Enter age (0-120)"
+                      className={`w-full px-4 py-3 rounded-xl border transition-all outline-none ${
+                        ageHasError
+                          ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                          : 'border-gray-200 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200'
+                      }`}
                     />
                   </div>
+
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       Gender *
                     </label>
-                    <div className="relative">
-                      <select
-                        value={gender}
-                        onChange={(e) => setGender(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 transition-all outline-none appearance-none bg-white"
-                      >
-                        <option>Male</option>
-                        <option>Female</option>
-                      </select>
-                      <ChevronDown className="absolute right-3 top-3.5 w-5 h-5 text-gray-400 pointer-events-none" />
-                    </div>
+
+                    {/* Gender button (menu is portaled to body so it always overlays) */}
+                    <button
+                      ref={genderBtnRef}
+                      type="button"
+                      onClick={() => {
+                        setShowGenderDropdown((v) => {
+                          const next = !v;
+                          if (next) {
+                            const idx = genderOptions.indexOf(gender);
+                            setGenderSelectedIndex(idx >= 0 ? idx : 0);
+                          } else {
+                            setGenderSelectedIndex(-1);
+                          }
+                          return next;
+                        });
+                      }}
+                      onKeyDown={handleGenderKeyDown}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 transition-all outline-none appearance-none bg-white text-left flex items-center justify-between"
+                      aria-haspopup="listbox"
+                      aria-expanded={showGenderDropdown}
+                    >
+                      <span className="text-gray-900">{gender}</span>
+                      <ChevronDown className="w-5 h-5 text-gray-400 pointer-events-none" />
+                    </button>
+
+                    <DropdownPortal isOpen={showGenderDropdown} style={genderMenuStyle}>
+                      <div id="gender-dropdown-menu" role="listbox">
+                        {genderOptions.map((opt, idx) => {
+                          const isSelected = opt === gender;
+                          const isActive = idx === genderSelectedIndex;
+                          return (
+                            <button
+                              key={opt}
+                              type="button"
+                              onMouseEnter={() => setGenderSelectedIndex(idx)}
+                              onClick={() => {
+                                setGender(opt);
+                                setShowGenderDropdown(false);
+                                setGenderSelectedIndex(-1);
+                              }}
+                              className={`w-full text-left px-4 py-2 transition-colors border-b border-gray-50 last:border-0 ${
+                                isActive ? 'bg-cyan-100' : isSelected ? 'bg-cyan-50' : 'hover:bg-cyan-50'
+                              }`}
+                              role="option"
+                              aria-selected={isSelected}
+                            >
+                              <div className="text-sm font-medium text-gray-900">{opt}</div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </DropdownPortal>
                   </div>
                 </div>
 
@@ -390,21 +634,66 @@ const TriageSystem = () => {
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       <AlertCircle className="inline w-4 h-4 mr-1" />
-                      Severity *
+                      Symptom's Severity *
                     </label>
-                    <div className="relative">
-                      <select
-                        value={severity}
-                        onChange={(e) => setSeverity(e.target.value)}
-                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 transition-all outline-none appearance-none bg-white"
-                      >
-                        <option>Mild</option>
-                        <option>Moderate</option>
-                        <option>Severe</option>
-                      </select>
-                      <ChevronDown className="absolute right-3 top-3.5 w-5 h-5 text-gray-400 pointer-events-none" />
-                    </div>
+
+                    {/* Severity button (menu is portaled to body so it always overlays) */}
+                    <button
+                      ref={severityBtnRef}
+                      type="button"
+                      onClick={() => {
+                        setShowSeverityDropdown((v) => {
+                          const next = !v;
+                          if (next) {
+                            const idx = severityOptions.findIndex(o => o.value === severity);
+                            setSeveritySelectedIndex(idx >= 0 ? idx : 0);
+                          } else {
+                            setSeveritySelectedIndex(-1);
+                          }
+                          return next;
+                        });
+                      }}
+                      onKeyDown={handleSeverityKeyDown}
+                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 transition-all outline-none appearance-none bg-white text-left flex items-center justify-between"
+                      aria-haspopup="listbox"
+                      aria-expanded={showSeverityDropdown}
+                    >
+                      <span className="text-gray-900">{severity}</span>
+                      <ChevronDown className="w-5 h-5 text-gray-400 pointer-events-none" />
+                    </button>
+
+                    <DropdownPortal isOpen={showSeverityDropdown} style={severityMenuStyle}>
+                      <div id="severity-dropdown-menu" role="listbox">
+                        {severityOptions.map((opt, idx) => {
+                          const isSelected = opt.value === severity;
+                          const isActive = idx === severitySelectedIndex;
+                          return (
+                            <button
+                              key={opt.value}
+                              type="button"
+                              onMouseEnter={() => setSeveritySelectedIndex(idx)}
+                              onClick={() => {
+                                setSeverity(opt.value);
+                                setShowSeverityDropdown(false);
+                                setSeveritySelectedIndex(-1);
+                              }}
+                              className={`w-full text-left px-4 py-2 transition-colors border-b border-gray-50 last:border-0 ${
+                                isActive ? 'bg-cyan-100' : isSelected ? 'bg-cyan-50' : 'hover:bg-cyan-50'
+                              }`}
+                              role="option"
+                              aria-selected={isSelected}
+                            >
+                              <div className="font-medium text-gray-900 text-sm">{opt.value}</div>
+                              <div className="text-[11px] text-gray-600 leading-tight mt-0">
+                                {opt.desc}
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </DropdownPortal>
                   </div>
+
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2">
                       <Calendar className="inline w-4 h-4 mr-1" />
@@ -414,8 +703,12 @@ const TriageSystem = () => {
                       type="text"
                       value={duration}
                       onChange={handleDurationChange}
-                      placeholder="Enter days"
-                      className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 transition-all outline-none"
+                      placeholder="Enter days (0-365)"
+                      className={`w-full px-4 py-3 rounded-xl border transition-all outline-none ${
+                        durationHasError
+                          ? 'border-red-400 focus:border-red-500 focus:ring-2 focus:ring-red-200'
+                          : 'border-gray-200 focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200'
+                      }`}
                     />
                   </div>
                 </div>
@@ -452,7 +745,7 @@ const TriageSystem = () => {
                       ? 'bg-gradient-to-br from-red-50 to-orange-50 border border-red-200'
                       : 'bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200'
                   }`}>
-                    {/* Confidence badge in top-right (v2: confidence_percent already 0..100) */}
+                    {/* Confidence badge */}
                     <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full border border-blue-200 shadow-sm">
                       <div className="flex items-center space-x-1.5">
                         <span className="text-xs font-semibold text-gray-600">CONFIDENCE</span>
@@ -467,7 +760,6 @@ const TriageSystem = () => {
                       {getDisplayRecommendation(result.recommendation)}
                     </div>
 
-                    {/* Explanation from API (LLM/user_explanation) */}
                     {result.user_explanation && (
                       <p className="text-gray-700 text-sm leading-relaxed whitespace-pre-line">
                         {result.user_explanation}
@@ -475,7 +767,7 @@ const TriageSystem = () => {
                     )}
                   </div>
 
-                  {/* Feedback Section (smaller + compact) - ID removed */}
+                  {/* Feedback Section */}
                   <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
                     <div className="mb-2">
                       <h4 className="text-sm font-bold text-gray-800">
