@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo, useRef, useLayoutEffect } from 're
 import ReactDOM from 'react-dom';
 import { Search, ChevronDown, Activity, Calendar, User, AlertCircle, Star } from 'lucide-react';
 
-// const API_URL = "/api";
-const API_URL = "http://127.0.0.1:8000";
+const API_URL = "/api";
+// const API_URL = "http://127.0.0.1:8000";
 
 // Helper: compute a fixed-position dropdown menu style that stays on top of everything
 const useFixedDropdownPosition = (isOpen, anchorRef, offset = 8) => {
